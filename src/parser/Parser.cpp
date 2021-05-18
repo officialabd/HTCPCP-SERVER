@@ -5,7 +5,7 @@ char *parse(ParserData *pd) {
     strcpy(message, pd->message);
 
     std::string temp;
-    char *method, *potStr, *server, *additions, *content_type, *body;
+    char *method, *potStr, *server, *additions, *content_type, *body, *tempBodyResponse;
     int potnum, message_size, method_num;
     int status_code = OK;
     ALLOC(method, MAX_MESSAGE_SIZE);
@@ -14,6 +14,7 @@ char *parse(ParserData *pd) {
     ALLOC(additions, MAX_MESSAGE_SIZE);
     ALLOC(content_type, MAX_MESSAGE_SIZE);
     ALLOC(body, MAX_MESSAGE_SIZE);
+    ALLOC(tempBodyResponse, MAX_MESSAGE_SIZE);
 
     std::istringstream iss(message); /** Stream of the client request, used to parse the request by lines*/
     int index = 0;
@@ -115,18 +116,20 @@ char *parse(ParserData *pd) {
             }
         }
     }
-    if (status_code == OK)
-        status_code = parseAdditions(additions);
 
-    return buildResponse(pd, potnum, status_code, additions, method_num);
+    if (status_code == OK)
+        status_code = parseAdditions(additions, tempBodyResponse);
+
+    return buildResponse(pd, potnum, status_code, additions, method_num, tempBodyResponse);
 }
 
-int parseAdditions(char *additions) {
+int parseAdditions(char *additions, char *bodyResponse) {
     std::istringstream iss((strcat(additions, "#") + 1));
     std::string temp;
 
     while (getline(iss, temp, ';')) {
         if ((strlen(temp.c_str()) == 0) || !findAddition(temp.c_str())) {
+            strcpy(bodyResponse, "\r\nOnly these additions allowed: \n(Cream),       (Half-and-half),       (Whole-milk),\n(Part-Skim),   (Skim),                (Non-Dairy),\n(Vanilla),     (Almond),              (Raspberry),\n(Whisky),      (Rum),                 (Kahlua),\n(Aquavit)");
             return Not_Acceptable;
         }
         getline(iss, temp, '#');
@@ -134,8 +137,9 @@ int parseAdditions(char *additions) {
         if (add_cap == 0) {
             return Bad_Request;
         }
-        if (add_cap < 1 || add_cap > 3) {
-            return Not_Found;
+        if (add_cap < 1 || add_cap > 5) {
+            strcpy(bodyResponse, "\r\n1-5 Only Allowed");
+            return Not_Acceptable;
         }
     }
     return OK;
@@ -151,10 +155,13 @@ bool findAddition(const char *temp) {
     return false;
 }
 
-char *buildResponse(ParserData *pd, int potnum, int status_code, char *additions, int method_num) {
+char *buildResponse(ParserData *pd, int potnum, int status_code, char *additions, int method_num, char *bodyMessage) {
     char *response;
     ALLOC(response, MAX_MESSAGE_SIZE * 4);
-    sprintf(response, "%s %d %s\r\n\r\n", HTCPCP_VERSION, status_code, findMessageResponse(status_code));
+    sprintf(response, "%s %d %s\r\n", HTCPCP_VERSION, status_code, findMessageResponse(status_code));
+    if ((bodyMessage != NULL) && (status_code != OK)) {
+        strcat(response, bodyMessage);
+    }
     if (status_code == OK) {
         switch (method_num) {
             case NBREW:
@@ -194,10 +201,14 @@ char *buildResponse(ParserData *pd, int potnum, int status_code, char *additions
 
                 } else {
                     if (pd->isItBrewing) {
-                        strcat(response, "\r\n\r\nBrewing your coffee\r\n");
+                        strcat(response, "\r\nBrewing your coffee\r\n");
+                    } else if (pd->potsAreBrewing[potnum - 1] || pd->potsArePooring[potnum - 1]) {
+                        char *tempPot = (char *)calloc(sizeof(char), 128);
+                        sprintf(tempPot, "\r\npot %d in use\r\n", potnum);
+                        strcat(response, tempPot);
                     } else {
                         char *tempPot = (char *)calloc(sizeof(char), 128);
-                        sprintf(tempPot, "Retry-After: 5\r\n\r\npot %d ready to use\r\n", potnum);
+                        sprintf(tempPot, "\r\npot %d ready to use\r\n", potnum);
                         strcat(response, tempPot);
                     }
                     break;
@@ -210,13 +221,13 @@ char *buildResponse(ParserData *pd, int potnum, int status_code, char *additions
 char *makeCoffee(ParserData *pd, int potnum, char *additions) {
     pd->isItBrewing = true;
     pd->potsAreBrewing[potnum - 1] = 1;
-    char *coffee = (char *)"         {\n      {   }\n       }_{ __{\n    .-{   }   }-.\n   (   }     {   )\n   | -.._____..- |\n   |             ;--.\n   |            (__  \n   |             | )  )\n   |             |/  /\n   |             /  /\n   |            (  /\n   |             /\n    -.._____..-/";
-    sleep(5);
+    char *coffee = (char *)"\n         {\n      {   }\n       }_{ __{\n    .-{   }   }-.\n   (   }     {   )\n   | -.._____..- |\n   |             ;--.\n   |            (__  \n   |             | )  )\n   |             |/  /\n   |             /  /\n   |            (  /\n   |             /\n    -.._____..-/";
+    sleep(BREWING_TIME);
     pd->isItBrewing = false;
     pd->potsAreBrewing[potnum - 1] = 0;
     pd->potsArePooring[potnum - 1] = 1;
     pd->isItPooring = true;
-    sleep(2);
+    sleep(POORING_TIME);
     pd->potsArePooring[potnum - 1] = 0;
     pd->isItPooring = false;
 

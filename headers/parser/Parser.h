@@ -36,6 +36,9 @@
 #define NO "-"
 #define YES "YES"
 
+#define BREWING_TIME 5
+#define POORING_TIME 2
+
 /**
  * Stores all data needed be parser.
  */
@@ -58,13 +61,14 @@ char *parse(ParserData *pd);
 /**
  * This function parse the client additions.
  * @param additions String of all additions.
+ * @param bodyResponse if no addition found stores the list of the additions available in bodyResponse, otherwise do nothing with bodyResponse.
  * @return int response code number.
  */
-int parseAdditions(char *additions);
+int parseAdditions(char *additions, char *bodyResponse);
 
 /**
  * This function checks if addition (temp) exits.
- * @param temp temp string of the addition.
+ * @param temp temp string of the addition. 
  * @return boolean if it exits or not.
  */
 bool findAddition(const char *temp);
@@ -76,9 +80,10 @@ bool findAddition(const char *temp);
  * @param status_code Used to get the status message to build response.
  * @param additions Currenlty useless!
  * @param method_num The method that client used. Used to specify response.
+ * @param bodyResponse String of the body message.
  * @return String of the response.
  */
-char *buildResponse(ParserData *pd, int potnum, int status_code, char *additions, int method_num);
+char *buildResponse(ParserData *pd, int potnum, int status_code, char *additions, int method_num, char *bodyResponse);
 
 /**
  * This function makes coffee for the client.
